@@ -1,0 +1,1 @@
+import {Router} from 'express'; import {listFeedback,createFeedback,createMessage} from '../controllers/feedback.controller.js'; import {requireAuth} from '../middleware/auth.middleware.js'; const r=Router(); r.get('/',listFeedback); r.post('/',createFeedback); r.post('/messages',createMessage); export default r;

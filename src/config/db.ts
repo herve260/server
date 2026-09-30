@@ -1,0 +1,54 @@
+import mysql from 'mysql2/promise';
+import { env } from './env.js';
+
+export const pool = mysql.createPool({
+  host: env.DATABASE_HOST,
+  port: env.DATABASE_PORT,
+  user: env.DATABASE_USER,
+  password: env.DATABASE_PASSWORD,
+  database: env.DATABASE_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  charset: 'utf8mb4'
+});
+
+export async function query<T = any>(sql: string, params: any[] = []): Promise<T[]> {
+  const [rows] = await pool.execute(sql, params);
+  return rows as T[];
+}
+
+export async function one<T = any>(sql: string, params: any[] = []): Promise<T | null> {
+  const [rows] = await pool.execute(sql, params);
+  if (rows && typeof rows === 'object' && !Array.isArray(rows) && 'insertId' in (rows as any)) return rows as T;
+  return (Array.isArray(rows) ? (rows as T[])[0] : rows) ?? null;
+}
+
+export async function run(sql: string, params: any[] = []) {
+  const [result] = await pool.execute(sql, params);
+  return result as any;
+}
+
+export async function initDatabase() {
+  // Create the configured database automatically when it does not exist.
+  const bootstrap = await mysql.createConnection({host: env.DATABASE_HOST, port: env.DATABASE_PORT, user: env.DATABASE_USER, password: env.DATABASE_PASSWORD});
+  await bootstrap.query(`CREATE DATABASE IF NOT EXISTS \`${env.DATABASE_NAME.replace(/`/g, '')}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`);
+  await bootstrap.end();
+  const statements = [
+    `CREATE TABLE IF NOT EXISTS users (id INT AUTO_INCREMENT PRIMARY KEY,name VARCHAR(150) NOT NULL,email VARCHAR(191) NOT NULL UNIQUE,phone VARCHAR(30),password_hash VARCHAR(255) NOT NULL,role ENUM('VISITOR','STUDENT','COMPANY','ADMIN','SUPER_ADMIN') NOT NULL DEFAULT 'STUDENT',language VARCHAR(10) NOT NULL DEFAULT 'en',status ENUM('ACTIVE','INACTIVE','SUSPENDED') NOT NULL DEFAULT 'ACTIVE',created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS refresh_tokens (id INT AUTO_INCREMENT PRIMARY KEY,token_hash CHAR(64) NOT NULL UNIQUE,user_id INT NOT NULL,expires_at DATETIME NOT NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,revoked_at DATETIME NULL,user_agent VARCHAR(500),ip_address VARCHAR(64),INDEX(user_id),FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)`,
+    `CREATE TABLE IF NOT EXISTS categories (id INT AUTO_INCREMENT PRIMARY KEY,name VARCHAR(100) NOT NULL UNIQUE,slug VARCHAR(120) NOT NULL UNIQUE,description TEXT,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS destinations (id INT AUTO_INCREMENT PRIMARY KEY,name VARCHAR(180) NOT NULL,slug VARCHAR(191) NOT NULL UNIQUE,location VARCHAR(180) NOT NULL,description TEXT NOT NULL,short_description VARCHAR(500),image_url VARCHAR(500),latitude DECIMAL(10,7),longitude DECIMAL(10,7),category_id INT NULL,featured BOOLEAN NOT NULL DEFAULT FALSE,status ENUM('DRAFT','PUBLISHED','ARCHIVED') NOT NULL DEFAULT 'DRAFT',created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX(category_id),FOREIGN KEY(category_id) REFERENCES categories(id) ON DELETE SET NULL)`,
+    `CREATE TABLE IF NOT EXISTS destination_images (id INT AUTO_INCREMENT PRIMARY KEY,destination_id INT NOT NULL,image_url VARCHAR(500) NOT NULL,caption VARCHAR(255),sort_order INT NOT NULL DEFAULT 0,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(destination_id) REFERENCES destinations(id) ON DELETE CASCADE)`,
+    `CREATE TABLE IF NOT EXISTS internships (id INT AUTO_INCREMENT PRIMARY KEY,company_name VARCHAR(180) NOT NULL,title VARCHAR(180) NOT NULL,location VARCHAR(180) NOT NULL,description TEXT NOT NULL,requirements TEXT,duration VARCHAR(100),deadline DATETIME,contact_email VARCHAR(191),registration_fee DECIMAL(12,2) NOT NULL DEFAULT 0,payment_note VARCHAR(500),status ENUM('DRAFT','PUBLISHED','ARCHIVED') NOT NULL DEFAULT 'DRAFT',created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX(status))`,
+    `CREATE TABLE IF NOT EXISTS internship_applications (id INT AUTO_INCREMENT PRIMARY KEY,internship_id INT NOT NULL,user_id INT NOT NULL,full_name VARCHAR(180) NOT NULL,email VARCHAR(191) NOT NULL,phone VARCHAR(30),school VARCHAR(180),course VARCHAR(180),level VARCHAR(100),cv_url VARCHAR(500),cover_letter TEXT,status ENUM('PENDING','REVIEWING','SHORTLISTED','ACCEPTED','REJECTED','WITHDRAWN') NOT NULL DEFAULT 'PENDING',applied_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_application (internship_id,user_id),FOREIGN KEY(internship_id) REFERENCES internships(id) ON DELETE CASCADE,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)`,
+    `CREATE TABLE IF NOT EXISTS internship_payments (id INT AUTO_INCREMENT PRIMARY KEY,application_id INT NOT NULL,user_id INT NOT NULL,internship_id INT NOT NULL,amount DECIMAL(12,2) NOT NULL,payment_method VARCHAR(50) NOT NULL,transaction_reference VARCHAR(191),status ENUM('PENDING','SUBMITTED','VERIFIED','REJECTED','REFUNDED') NOT NULL DEFAULT 'PENDING',paid_at DATETIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX(application_id),FOREIGN KEY(application_id) REFERENCES internship_applications(id) ON DELETE CASCADE,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,FOREIGN KEY(internship_id) REFERENCES internships(id) ON DELETE CASCADE)`,
+    `CREATE TABLE IF NOT EXISTS training_programs (id INT AUTO_INCREMENT PRIMARY KEY,title VARCHAR(180) NOT NULL,provider VARCHAR(180) NOT NULL,description TEXT NOT NULL,requirements TEXT,duration VARCHAR(100),start_date DATETIME,end_date DATETIME,fee DECIMAL(12,2),image_url VARCHAR(500),status ENUM('DRAFT','PUBLISHED','ARCHIVED') NOT NULL DEFAULT 'DRAFT',created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS training_registrations (id INT AUTO_INCREMENT PRIMARY KEY,training_id INT NOT NULL,user_id INT NOT NULL,status ENUM('PENDING','CONFIRMED','CANCELLED') NOT NULL DEFAULT 'PENDING',registered_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,UNIQUE KEY uq_training (training_id,user_id),FOREIGN KEY(training_id) REFERENCES training_programs(id) ON DELETE CASCADE,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)`,
+    `CREATE TABLE IF NOT EXISTS messages (id INT AUTO_INCREMENT PRIMARY KEY,name VARCHAR(150) NOT NULL,email VARCHAR(191) NOT NULL,subject VARCHAR(200),message TEXT NOT NULL,status ENUM('NEW','READ','ARCHIVED') NOT NULL DEFAULT 'NEW',created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP)`,
+    `CREATE TABLE IF NOT EXISTS feedback (id INT AUTO_INCREMENT PRIMARY KEY,user_id INT NULL,name VARCHAR(150) NOT NULL,email VARCHAR(191),rating TINYINT NOT NULL,comment TEXT NOT NULL,status ENUM('PENDING','APPROVED','REJECTED') NOT NULL DEFAULT 'PENDING',created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX(status),FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL)`,
+    `CREATE TABLE IF NOT EXISTS notifications (id INT AUTO_INCREMENT PRIMARY KEY,user_id INT NOT NULL,title VARCHAR(200) NOT NULL,message TEXT NOT NULL,type ENUM('SYSTEM','APPLICATION','TRAINING','MESSAGE','GENERAL') NOT NULL DEFAULT 'GENERAL',read_at DATETIME NULL,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE)`,
+    `CREATE TABLE IF NOT EXISTS audit_logs (id INT AUTO_INCREMENT PRIMARY KEY,user_id INT NULL,action VARCHAR(50) NOT NULL,entity VARCHAR(100) NOT NULL,entity_id INT NULL,metadata JSON,created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL)`
+  ];
+  for (const sql of statements) await pool.query(sql);
+}

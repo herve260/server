@@ -1,0 +1,132 @@
+# ================================
+
+# Dependencies
+
+# ================================
+
+node_modules/
+**/node_modules/
+
+# ================================
+
+# Environment variables / secrets
+
+# ================================
+
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# ================================
+
+# Build output
+
+# ================================
+
+dist/
+**/dist/
+build/
+**/build/
+
+# ================================
+
+# Vite
+
+# ================================
+
+.vite/
+
+# ================================
+
+# Logs
+
+# ================================
+
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ================================
+
+# TypeScript
+
+# ================================
+
+*.tsbuildinfo
+
+# ================================
+
+# Testing / Coverage
+
+# ================================
+
+coverage/
+.nyc_output/
+
+# ================================
+
+# IDE / Editor
+
+# ================================
+
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.idea/
+*.swp
+*.swo
+
+# ================================
+
+# OS files
+
+# ================================
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ================================
+
+# Temporary files
+
+# ================================
+
+*.tmp
+*.temp
+*.bak
+*.cache
+
+# ================================
+
+# Uploads
+
+# ================================
+
+uploads/
+server/uploads/
+
+# ================================
+
+# Database dumps / local database files
+
+# ================================
+
+*.sql
+*.sqlite
+*.sqlite3
+
+# ================================
+
+# Prisma (if any old Prisma files remain)
+
+# ================================
+
+.prisma/
+server/prisma/.env
+server/prisma/*.db

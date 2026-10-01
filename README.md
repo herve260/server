@@ -15,13 +15,9 @@ Swagger: http://localhost:5000/api/docs
 
 The backend accepts localhost frontend ports dynamically during development, so Vite can use 5173, 5174, 5175, etc.
 
-## Demo admin
 
-The seed uses `SEED_ADMIN_EMAIL` and `SEED_ADMIN_PASSWORD` from `.env`.
 
-Default values in `.env.example`:
-- Email: admin@buildfuturetourism.rw
-- Password: ChangeMe123!
+
 
 Change these before production.
 

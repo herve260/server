@@ -1,0 +1,19 @@
+import bcrypt from 'bcryptjs';
+import { initDatabase, one, query, pool } from './config/db.js';
+import { env } from './config/env.js';
+const cats = [['Nature & Wildlife', 'nature-wildlife'], ['Lakes & Relaxation', 'lakes-relaxation'], ['Safari', 'safari'], ['Forest & Nature', 'forest-nature'], ['City & Culture', 'city-culture'], ['History & Education', 'history-education'], ['Culture & History', 'culture-history'], ['Lakes & Nature', 'lakes-nature'], ['Adventure', 'adventure']];
+const dest = [['Volcanoes National Park', 'volcanoes-national-park', 'Musanze', 'Nature & Wildlife', -1.4537, 29.5392], ['Lake Kivu', 'lake-kivu', 'Western Rwanda', 'Lakes & Relaxation', -2.0605, 28.9068], ['Akagera National Park', 'akagera-national-park', 'Eastern Rwanda', 'Safari', -1.8761, 30.7069], ['Nyungwe Forest National Park', 'nyungwe-forest-national-park', 'Southern Rwanda', 'Forest & Nature', -2.5238, 29.2078], ['Kigali City', 'kigali-city', 'Kigali', 'City & Culture', -1.9441, 30.0619], ['Kigali Genocide Memorial', 'kigali-genocide-memorial', 'Kigali', 'History & Education', -1.9615, 30.1056], ['King\'s Palace Museum', 'kings-palace-museum', 'Nyanza', 'Culture & History', -2.348, 29.74], ['Musanze Caves', 'musanze-caves', 'Musanze', 'Adventure', -1.5, 29.62]];
+await initDatabase();
+for (const [name, slug] of cats)
+    await query('INSERT INTO categories(name,slug) VALUES(?,?) ON DUPLICATE KEY UPDATE name=VALUES(name)', [name, slug]);
+for (const [name, slug, location, cat, lat, lng] of dest) {
+    const c = await one('SELECT id FROM categories WHERE name=?', [cat]);
+    await query('INSERT INTO destinations(name,slug,location,description,short_description,latitude,longitude,category_id,featured,status) VALUES(?,?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE name=VALUES(name),category_id=VALUES(category_id),status=\'PUBLISHED\'', [name, slug, location, `${name} is one of the destinations highlighted by Build Future Tourism.`, `Discover ${name} in Rwanda.`, lat, lng, c?.id, ['Volcanoes National Park', 'Lake Kivu', 'Akagera National Park'].includes(name), 'PUBLISHED']);
+}
+const hash = await bcrypt.hash(env.SEED_ADMIN_PASSWORD, 12);
+await query('INSERT INTO users(name,email,password_hash,role,status) VALUES(?,?,?,\'SUPER_ADMIN\',\'ACTIVE\') ON DUPLICATE KEY UPDATE name=VALUES(name),password_hash=VALUES(password_hash),role=\'SUPER_ADMIN\',status=\'ACTIVE\'', ['Build Future Tourism Admin', env.SEED_ADMIN_EMAIL.toLowerCase(), hash]);
+await query('INSERT INTO internships(company_name,title,location,description,requirements,duration,contact_email,registration_fee,payment_note,status) SELECT ?,?,?,?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM internships WHERE title=?)', ['Build Future Tourism', 'Tourism Operations Intern', 'Kigali', 'Practical exposure to tourism operations and visitor experience.', 'Tourism student or graduate', '3 months', env.SEED_ADMIN_EMAIL.toLowerCase(), 25000, 'Registration fee is the initial payment to the company offering the internship. Payment is verified manually.', 'PUBLISHED', 'Tourism Operations Intern']);
+await query('INSERT INTO training_programs(title,provider,description,requirements,duration,fee,status) SELECT ?,?,?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM training_programs WHERE title=?)', ['Digital Tourism & Hospitality Skills', 'Build Future Tourism', 'Practical digital skills for tourism and hospitality careers.', 'Open to tourism students and graduates', '4 weeks', 0, 'PUBLISHED', 'Digital Tourism & Hospitality Skills']);
+console.log(`Seed complete. Admin: ${env.SEED_ADMIN_EMAIL}`);
+await pool.end();
+//# sourceMappingURL=db-seed.js.map

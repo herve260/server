@@ -1,0 +1,6 @@
+import { z } from 'zod';
+import { one, query } from '../config/db.js';
+export async function listFeedback(_req, res) { res.json({ success: true, data: await query('SELECT id,name,rating,comment,created_at FROM feedback WHERE status=\'APPROVED\' ORDER BY created_at DESC') }); }
+export async function createFeedback(req, res) { const d = z.object({ name: z.string().min(2).max(150), email: z.email().optional(), rating: z.coerce.number().int().min(1).max(5), comment: z.string().min(3).max(5000) }).parse(req.body); const r = await one('INSERT INTO feedback (user_id,name,email,rating,comment,status) VALUES (?,?,?,?,?,\'PENDING\')', [Number(req.user?.id) || null, d.name, d.email ?? null, d.rating, d.comment]); res.status(201).json({ success: true, message: 'Thank you for your feedback. It will appear after review.', data: { id: r?.insertId } }); }
+export async function createMessage(req, res) { const d = z.object({ name: z.string().min(2), email: z.email(), subject: z.string().max(200).optional(), message: z.string().min(5) }).parse(req.body); const r = await one('INSERT INTO messages (name,email,subject,message) VALUES (?,?,?,?)', [d.name, d.email, d.subject ?? null, d.message]); res.status(201).json({ success: true, message: 'Message received', data: { id: r?.insertId } }); }
+//# sourceMappingURL=feedback.controller.js.map

@@ -1,76 +1,49 @@
 import mysql from 'mysql2/promise';
 import { env } from './env.js';
-
 export const pool = mysql.createPool({
-  host: env.DATABASE_HOST,
-  port: env.DATABASE_PORT,
-  user: env.DATABASE_USER,
-  password: env.DATABASE_PASSWORD,
-  database: env.DATABASE_NAME,
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0,
-  charset: 'utf8mb4'
-});
-
-export async function query<T = any>(
-  sql: string,
-  params: any[] = []
-): Promise<T[]> {
-  const [rows] = await pool.execute(sql, params);
-
-  return rows as T[];
-}
-
-export async function one<T = any>(
-  sql: string,
-  params: any[] = []
-): Promise<T | null> {
-  const [rows] = await pool.execute(sql, params);
-
-  if (
-    rows &&
-    typeof rows === 'object' &&
-    !Array.isArray(rows) &&
-    'insertId' in (rows as any)
-  ) {
-    return rows as unknown as T;
-  }
-
-  return (
-    Array.isArray(rows)
-      ? (rows as T[])[0]
-      : (rows as unknown as T)
-  ) ?? null;
-}
-
-export async function run(
-  sql: string,
-  params: any[] = []
-) {
-  const [result] = await pool.execute(sql, params);
-
-  return result as any;
-}
-
-export async function initDatabase() {
-  const bootstrap = await mysql.createConnection({
     host: env.DATABASE_HOST,
     port: env.DATABASE_PORT,
     user: env.DATABASE_USER,
-    password: env.DATABASE_PASSWORD
-  });
-
-  await bootstrap.query(
-    `CREATE DATABASE IF NOT EXISTS \`${env.DATABASE_NAME.replace(/`/g, '')}\`
+    password: env.DATABASE_PASSWORD,
+    database: env.DATABASE_NAME,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    charset: 'utf8mb4'
+});
+export async function query(sql, params = []) {
+    const [rows] = await pool.execute(sql, params);
+    return rows;
+}
+export async function one(sql, params = []) {
+    const [rows] = await pool.execute(sql, params);
+    if (rows &&
+        typeof rows === 'object' &&
+        !Array.isArray(rows) &&
+        'insertId' in rows) {
+        return rows;
+    }
+    return (Array.isArray(rows)
+        ? rows[0]
+        : rows) ?? null;
+}
+export async function run(sql, params = []) {
+    const [result] = await pool.execute(sql, params);
+    return result;
+}
+export async function initDatabase() {
+    const bootstrap = await mysql.createConnection({
+        host: env.DATABASE_HOST,
+        port: env.DATABASE_PORT,
+        user: env.DATABASE_USER,
+        password: env.DATABASE_PASSWORD
+    });
+    await bootstrap.query(`CREATE DATABASE IF NOT EXISTS \`${env.DATABASE_NAME.replace(/`/g, '')}\`
      CHARACTER SET utf8mb4
-     COLLATE utf8mb4_unicode_ci`
-  );
-
-  await bootstrap.end();
-
-  const statements = [
-    `CREATE TABLE IF NOT EXISTS users (
+     COLLATE utf8mb4_unicode_ci`);
+    await bootstrap.end();
+    const statements = [
+        `CREATE TABLE IF NOT EXISTS users (
       id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(150) NOT NULL,
       email VARCHAR(191) NOT NULL UNIQUE,
@@ -85,8 +58,7 @@ export async function initDatabase() {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP
     )`,
-
-    `CREATE TABLE IF NOT EXISTS refresh_tokens (
+        `CREATE TABLE IF NOT EXISTS refresh_tokens (
       id INT AUTO_INCREMENT PRIMARY KEY,
       token_hash CHAR(64) NOT NULL UNIQUE,
       user_id INT NOT NULL,
@@ -100,16 +72,14 @@ export async function initDatabase() {
         REFERENCES users(id)
         ON DELETE CASCADE
     )`,
-
-    `CREATE TABLE IF NOT EXISTS categories (
+        `CREATE TABLE IF NOT EXISTS categories (
       id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(100) NOT NULL UNIQUE,
       slug VARCHAR(120) NOT NULL UNIQUE,
       description TEXT,
       created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`,
-
-    `CREATE TABLE IF NOT EXISTS destinations (
+        `CREATE TABLE IF NOT EXISTS destinations (
       id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(180) NOT NULL,
       slug VARCHAR(191) NOT NULL UNIQUE,
@@ -131,8 +101,7 @@ export async function initDatabase() {
         REFERENCES categories(id)
         ON DELETE SET NULL
     )`,
-
-    `CREATE TABLE IF NOT EXISTS destination_images (
+        `CREATE TABLE IF NOT EXISTS destination_images (
       id INT AUTO_INCREMENT PRIMARY KEY,
       destination_id INT NOT NULL,
       image_url VARCHAR(500) NOT NULL,
@@ -143,8 +112,7 @@ export async function initDatabase() {
         REFERENCES destinations(id)
         ON DELETE CASCADE
     )`,
-
-    `CREATE TABLE IF NOT EXISTS internships (
+        `CREATE TABLE IF NOT EXISTS internships (
       id INT AUTO_INCREMENT PRIMARY KEY,
       company_name VARCHAR(180) NOT NULL,
       title VARCHAR(180) NOT NULL,
@@ -163,8 +131,7 @@ export async function initDatabase() {
         ON UPDATE CURRENT_TIMESTAMP,
       INDEX(status)
     )`,
-
-    `CREATE TABLE IF NOT EXISTS internship_applications (
+        `CREATE TABLE IF NOT EXISTS internship_applications (
       id INT AUTO_INCREMENT PRIMARY KEY,
       internship_id INT NOT NULL,
       user_id INT NOT NULL,
@@ -195,8 +162,7 @@ export async function initDatabase() {
         REFERENCES users(id)
         ON DELETE CASCADE
     )`,
-
-    `CREATE TABLE IF NOT EXISTS internship_payments (
+        `CREATE TABLE IF NOT EXISTS internship_payments (
       id INT AUTO_INCREMENT PRIMARY KEY,
       application_id INT NOT NULL,
       user_id INT NOT NULL,
@@ -226,8 +192,7 @@ export async function initDatabase() {
         REFERENCES internships(id)
         ON DELETE CASCADE
     )`,
-
-    `CREATE TABLE IF NOT EXISTS training_programs (
+        `CREATE TABLE IF NOT EXISTS training_programs (
       id INT AUTO_INCREMENT PRIMARY KEY,
       title VARCHAR(180) NOT NULL,
       provider VARCHAR(180) NOT NULL,
@@ -244,8 +209,7 @@ export async function initDatabase() {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP
     )`,
-
-    `CREATE TABLE IF NOT EXISTS training_registrations (
+        `CREATE TABLE IF NOT EXISTS training_registrations (
       id INT AUTO_INCREMENT PRIMARY KEY,
       training_id INT NOT NULL,
       user_id INT NOT NULL,
@@ -262,8 +226,7 @@ export async function initDatabase() {
         REFERENCES users(id)
         ON DELETE CASCADE
     )`,
-
-    `CREATE TABLE IF NOT EXISTS messages (
+        `CREATE TABLE IF NOT EXISTS messages (
       id INT AUTO_INCREMENT PRIMARY KEY,
       name VARCHAR(150) NOT NULL,
       email VARCHAR(191) NOT NULL,
@@ -275,8 +238,7 @@ export async function initDatabase() {
       updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
         ON UPDATE CURRENT_TIMESTAMP
     )`,
-
-    `CREATE TABLE IF NOT EXISTS feedback (
+        `CREATE TABLE IF NOT EXISTS feedback (
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NULL,
       name VARCHAR(150) NOT NULL,
@@ -293,8 +255,7 @@ export async function initDatabase() {
         REFERENCES users(id)
         ON DELETE SET NULL
     )`,
-
-    `CREATE TABLE IF NOT EXISTS notifications (
+        `CREATE TABLE IF NOT EXISTS notifications (
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NOT NULL,
       title VARCHAR(200) NOT NULL,
@@ -312,8 +273,7 @@ export async function initDatabase() {
         REFERENCES users(id)
         ON DELETE CASCADE
     )`,
-
-    `CREATE TABLE IF NOT EXISTS audit_logs (
+        `CREATE TABLE IF NOT EXISTS audit_logs (
       id INT AUTO_INCREMENT PRIMARY KEY,
       user_id INT NULL,
       action VARCHAR(50) NOT NULL,
@@ -325,9 +285,9 @@ export async function initDatabase() {
         REFERENCES users(id)
         ON DELETE SET NULL
     )`
-  ];
-
-  for (const sql of statements) {
-    await pool.query(sql);
-  }
+    ];
+    for (const sql of statements) {
+        await pool.query(sql);
+    }
 }
+//# sourceMappingURL=db.js.map

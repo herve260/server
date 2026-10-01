@@ -1,0 +1,21 @@
+import { z } from 'zod';
+import { query, one } from '../config/db.js';
+import { HttpError } from '../utils/http-error.js';
+import { createNotification } from '../services/notification.service.js';
+export async function listTraining(req, res) { const s = String(req.query.search ?? '').trim(); const rows = await query(`SELECT * FROM training_programs WHERE status='PUBLISHED'${s ? ' AND (title LIKE ? OR description LIKE ?)' : ''} ORDER BY start_date,created_at DESC`, s ? [`%${s}%`, `%${s}%`] : []); res.json({ success: true, data: rows.map((x) => ({ ...x, startDate: x.start_date, endDate: x.end_date, imageUrl: x.image_url, fee: x.fee == null ? null : Number(x.fee) })) }); }
+export async function getTraining(req, res) { const x = await one('SELECT * FROM training_programs WHERE id=? AND status=\'PUBLISHED\'', [Number(req.params.id)]); if (!x)
+    throw new HttpError(404, 'Training program not found'); res.json({ success: true, data: { ...x, fee: x.fee == null ? null : Number(x.fee), imageUrl: x.image_url } }); }
+export async function registerTraining(req, res) { const userId = Number(req.user.id), id = Number(req.params.id); const p = await one('SELECT * FROM training_programs WHERE id=? AND status=\'PUBLISHED\'', [id]); if (!p)
+    throw new HttpError(404, 'Training program not found'); if (await one('SELECT id FROM training_registrations WHERE training_id=? AND user_id=?', [id, userId]))
+    throw new HttpError(409, 'You are already registered for this training program'); const r = await one('INSERT INTO training_registrations (training_id,user_id) VALUES (?,?)', [id, userId]); await createNotification(userId, 'Training registration received', `Your registration for ${p.title} was received.`, 'TRAINING'); res.status(201).json({ success: true, message: 'Training registration submitted', data: { id: r?.insertId, trainingId: id, userId, status: 'PENDING', training: p } }); }
+export async function listMyTraining(req, res) { res.json({ success: true, data: await query('SELECT r.*,t.title,t.provider,t.description,t.fee FROM training_registrations r JOIN training_programs t ON t.id=r.training_id WHERE r.user_id=? ORDER BY r.registered_at DESC', [req.user.id]) }); }
+const input = z.object({ title: z.string().min(2), provider: z.string().min(2), description: z.string().min(10), requirements: z.string().optional(), duration: z.string().optional(), startDate: z.coerce.date().optional(), endDate: z.coerce.date().optional(), fee: z.coerce.number().min(0).optional(), imageUrl: z.url().optional(), status: z.enum(['DRAFT', 'PUBLISHED', 'ARCHIVED']).optional() });
+export async function adminListTraining(_req, res) { res.json({ success: true, data: await query('SELECT t.*, (SELECT COUNT(*) FROM training_registrations r WHERE r.training_id=t.id) registrations_count FROM training_programs t ORDER BY t.created_at DESC') }); }
+export async function adminCreateTraining(req, res) { const d = input.parse(req.body); const r = await one('INSERT INTO training_programs (title,provider,description,requirements,duration,start_date,end_date,fee,image_url,status) VALUES (?,?,?,?,?,?,?,?,?,?)', [d.title, d.provider, d.description, d.requirements ?? null, d.duration ?? null, d.startDate ?? null, d.endDate ?? null, d.fee ?? 0, d.imageUrl ?? null, d.status ?? 'DRAFT']); res.status(201).json({ success: true, data: { id: r?.insertId, ...d } }); }
+export async function adminUpdateTraining(req, res) { const d = input.partial().parse(req.body); const fields = { title: 'title', provider: 'provider', description: 'description', requirements: 'requirements', duration: 'duration', startDate: 'start_date', endDate: 'end_date', fee: 'fee', imageUrl: 'image_url', status: 'status' }; const sets = []; const p = []; for (const [k, v] of Object.entries(d)) {
+    sets.push(`${fields[k]}=?`);
+    p.push(v);
+} if (!sets.length)
+    return res.json({ success: true }); p.push(Number(req.params.id)); await query(`UPDATE training_programs SET ${sets.join(',')} WHERE id=?`, p); res.json({ success: true }); }
+export async function adminDeleteTraining(req, res) { await query('DELETE FROM training_programs WHERE id=?', [Number(req.params.id)]); res.json({ success: true, message: 'Training program deleted' }); }
+//# sourceMappingURL=training.controller.js.map

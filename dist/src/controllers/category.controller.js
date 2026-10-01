@@ -1,0 +1,3 @@
+import { query } from '../config/db.js';
+export async function listCategories(_req, res) { const rows = await query('SELECT c.*, (SELECT COUNT(*) FROM destinations d WHERE d.category_id=c.id) destination_count FROM categories c ORDER BY c.name'); res.json({ success: true, data: rows.map((x) => ({ ...x, _count: { destinations: x.destination_count } })) }); }
+//# sourceMappingURL=category.controller.js.map

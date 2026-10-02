@@ -6,7 +6,7 @@ import { HttpError } from '../utils/http-error.js';
 import { getClientIp, hashToken, signAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt.js';
 const schema = z.object({ name: z.string().trim().min(2).max(150).optional(), email: z.email(), phone: z.string().trim().max(30).optional(), password: z.string().min(8).max(100) });
 const pub = (u) => ({ id: u.id, name: u.name, email: u.email, phone: u.phone, role: u.role, language: u.language, status: u.status, createdAt: u.created_at ?? u.createdAt });
-function cookie(res, t) { res.cookie(env.COOKIE_NAME, t, { httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: 'lax', path: '/api/auth', maxAge: 7 * 86400000 }); }
+function cookie(res, t) { res.cookie(env.COOKIE_NAME, t, { httpOnly: true, secure: env.NODE_ENV === 'production', sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax', path: '/api/auth', maxAge: 7 * 86400000 }); }
 async function tokens(user, req, res) { const accessToken = signAccessToken(user.id, user.role); const { token } = signRefreshToken(user.id); const p = verifyRefreshToken(token); await query('INSERT INTO refresh_tokens (token_hash,user_id,expires_at,user_agent,ip_address) VALUES (?,?,?,?,?)', [hashToken(token), user.id, new Date(p.exp * 1000), req.get('user-agent')?.slice(0, 500) ?? null, getClientIp(req)?.slice(0, 64)]); cookie(res, token); return accessToken; }
 export async function register(req, res) { const d = schema.parse(req.body); if (!d.name)
     throw new HttpError(400, 'Name is required for registration'); const email = d.email.toLowerCase(); if (await one('SELECT id FROM users WHERE email=?', [email]))
